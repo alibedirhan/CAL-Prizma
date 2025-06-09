@@ -26,12 +26,6 @@ jobs:
         
     - name: Build executable
       run: |
-        pyinstaller --onefile --windowed --name="PrismSimulator" --icon=icon.ico PrismSimulator.py
-      continue-on-error: true  # icon.ico yoksa devam et
-      
-    - name: Build executable (without icon)
-      if: failure()
-      run: |
         pyinstaller --onefile --windowed --name="PrismSimulator" PrismSimulator.py
         
     - name: Test executable
