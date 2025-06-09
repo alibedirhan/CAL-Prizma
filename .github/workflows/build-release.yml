@@ -1,0 +1,117 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # v1.0.0, v1.1.0 gibi tag'ler için çalışır
+  workflow_dispatch:  # Manuel tetikleme için
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install numpy matplotlib pyinstaller
+        
+    - name: Build executable
+      run: |
+        pyinstaller --onefile --windowed --name="PrismSimulator" --icon=icon.ico PrismSimulator.py
+      continue-on-error: true  # icon.ico yoksa devam et
+      
+    - name: Build executable (without icon)
+      if: failure()
+      run: |
+        pyinstaller --onefile --windowed --name="PrismSimulator" PrismSimulator.py
+        
+    - name: Test executable
+      run: |
+        # Exe dosyasının var olduğunu kontrol et
+        if (Test-Path "dist/PrismSimulator.exe") {
+          Write-Host "✅ Executable successfully created"
+          Get-Item "dist/PrismSimulator.exe" | Select-Object Name, Length, LastWriteTime
+        } else {
+          Write-Host "❌ Executable not found"
+          exit 1
+        }
+      shell: powershell
+      
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: PrismSimulator-Windows
+        path: dist/PrismSimulator.exe
+        
+  create-release:
+    needs: build-windows
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Download Windows artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: PrismSimulator-Windows
+        path: ./artifacts/
+        
+    - name: Get version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.get_version.outputs.VERSION }}
+        release_name: Prizma Simulatörü ${{ steps.get_version.outputs.VERSION }}
+        body: |
+          ## 🌈 Prizma Optik Simulatörü ${{ steps.get_version.outputs.VERSION }}
+          
+          ### 📥 İndirme
+          - **Windows Kullanıcıları**: `PrismSimulator.exe` dosyasını indirip çift tıklayın
+          - **Python Kullanıcıları**: Kaynak kodunu indirip `python PrismSimulator.py` ile çalıştırın
+          
+          ### ✨ Bu Sürümdeki Özellikler
+          - Gerçek zamanlı prizma simülasyonu
+          - BK7 cam malzemesi ile dispersiyon analizi
+          - Türkçe kullanıcı arayüzü
+          - Fizik hesaplamaları ve görselleştirme
+          
+          ### 🔧 Kurulum
+          1. `PrismSimulator.exe` dosyasını indirin
+          2. Dosyaya çift tıklayın (kurulum gerektirmez)
+          3. Windows Defender uyarısı çıkarsa "Daha fazla bilgi" → "Yine de çalıştır"
+          
+          ### 📋 Sistem Gereksinimleri
+          - Windows 10/11 (x64)
+          - .NET Framework (Windows ile birlikte gelir)
+          
+          ---
+          🐛 **Sorun mu yaşıyorsunuz?** [Issues](../../issues) sayfasından bildirin
+        draft: false
+        prerelease: false
+        
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./artifacts/PrismSimulator.exe
+        asset_name: PrismSimulator.exe
+        asset_content_type: application/octet-stream
