@@ -30,7 +30,6 @@ jobs:
         
     - name: Test executable
       run: |
-        # Exe dosyasının var olduğunu kontrol et
         if (Test-Path "dist/PrismSimulator.exe") {
           Write-Host "✅ Executable successfully created"
           Get-Item "dist/PrismSimulator.exe" | Select-Object Name, Length, LastWriteTime
@@ -46,35 +45,14 @@ jobs:
         name: PrismSimulator-Windows
         path: dist/PrismSimulator.exe
         
-  create-release:
-    needs: build-windows
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Download Windows artifact
-      uses: actions/download-artifact@v4
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
       with:
-        name: PrismSimulator-Windows
-        path: ./artifacts/
-        
-    - name: Get version from tag
-      id: get_version
-      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-      
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ steps.get_version.outputs.VERSION }}
-        release_name: Prizma Simulatörü ${{ steps.get_version.outputs.VERSION }}
+        files: dist/PrismSimulator.exe
+        name: Prizma Simulatörü ${{ github.ref_name }}
         body: |
-          ## 🌈 Prizma Optik Simulatörü ${{ steps.get_version.outputs.VERSION }}
+          ## 🌈 Prizma Optik Simulatörü ${{ github.ref_name }}
           
           ### 📥 İndirme
           - **Windows Kullanıcıları**: `PrismSimulator.exe` dosyasını indirip çift tıklayın
@@ -82,7 +60,7 @@ jobs:
           
           ### ✨ Bu Sürümdeki Özellikler
           - Gerçek zamanlı prizma simülasyonu
-          - BK7 cam malzemesi ile dispersiyon analizi
+          - Optik cam malzemesi ile dispersiyon analizi
           - Türkçe kullanıcı arayüzü
           - Fizik hesaplamaları ve görselleştirme
           
@@ -99,13 +77,5 @@ jobs:
           🐛 **Sorun mu yaşıyorsunuz?** [Issues](../../issues) sayfasından bildirin
         draft: false
         prerelease: false
-        
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./artifacts/PrismSimulator.exe
-        asset_name: PrismSimulator.exe
-        asset_content_type: application/octet-stream
